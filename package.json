@@ -5,7 +5,7 @@
   "main": "lib/index.js",
   "scripts": {
     "test": "npm run build && npm run test:node",
-    "test:node": "node --harmony node_modules/istanbul/lib/cli.js cover -- lab -vl && istanbul check-coverage",
+    "test:node": "node --harmony node_modules/istanbul/lib/cli.js cover -- node_modules/lab -vl && node --harmony node_modules/istanbul check-coverage",
     "prepublish": "npm run build",
     "build": "babel ./src -d lib"
   },

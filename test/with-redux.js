@@ -207,7 +207,7 @@ describe('Pouch Redux Middleware', function() {
         update: (doc) => { return {type: actionTypes.UPDATE_TODO, todo: doc} }
       },
       initialBatchDispatched(err) {
-        expect(err).to.equal(new Error('Some PouchDB error'));
+        expect(err.message).to.equal('Some PouchDB error');
         done();
       }
     });

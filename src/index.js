@@ -23,8 +23,9 @@ function createPouchMiddleware(_paths) {
     propagateUpdate,
     propagateInsert,
     propagateBatchInsert,
-    handleResponse: function(err, data, cb) { cb(err); },
+    handleResponse: function (err, data, cb) { cb(err); },
     queue: Queue(1),
+    delayInitialBatchInsert: false,
     docs: {},
     actions: {
       remove: defaultAction('remove'),
@@ -34,24 +35,24 @@ function createPouchMiddleware(_paths) {
     }
   }
 
-  paths = paths.map(function(path) {
+  paths = paths.map(function (path) {
     var spec = extend({}, defaultSpec, path);
     spec.actions = extend({}, defaultSpec.actions, spec.actions);
     spec.docs = {};
 
-    if (! spec.db) {
+    if (!spec.db) {
       throw new Error('path ' + path.path + ' needs a db');
     }
     return spec;
   });
 
   var subscriptions = [];
-  function subscribeToChanges(db){
-    var found = subscriptions.find(function(subDb) {
+  function subscribeToChanges(db) {
+    var found = subscriptions.find(function (subDb) {
       return subDb.db === db
     });
 
-    if (found != null){
+    if (found != null) {
       return found.changes;
     }
 
@@ -61,8 +62,19 @@ function createPouchMiddleware(_paths) {
       since: 'now',
     });
 
-    subscriptions.push({ db: db, changes: changes});
+    subscriptions.push({ db: db, changes: changes });
     return changes;
+  }
+
+  function initializeListening(path, dispatch, initialBatchDispatched) {
+    if (path.delayInitialBatchInsert) {
+      path.db.on('complete', () => {
+        listen(path, dispatch, initialBatchDispatched);
+      });
+    }
+    else {
+      listen(path, dispatch, initialBatchDispatched);
+    }
   }
 
   function listen(path, dispatch, initialBatchDispatched) {
@@ -89,7 +101,7 @@ function createPouchMiddleware(_paths) {
 
     /* istanbul ignore else */
     if (docs && docs.length) {
-      docs.forEach(function(docs) {
+      docs.forEach(function (docs) {
         var diffs = differences(path.docs, docs);
         diffs.new.concat(diffs.updated).forEach(doc => path.insert(doc))
         diffs.deleted.forEach(doc => path.remove(doc));
@@ -98,8 +110,8 @@ function createPouchMiddleware(_paths) {
   }
 
   function write(data, responseHandler) {
-    return function(done) {
-      data.db[data.type](data.doc, function(err, resp) {
+    return function (done) {
+      data.db[data.type](data.doc, function (err, resp) {
         responseHandler(
           err,
           {
@@ -107,7 +119,7 @@ function createPouchMiddleware(_paths) {
             doc: data.doc,
             type: data.type
           },
-          function(err2) {
+          function (err2) {
             done(err2, resp);
           }
         );
@@ -155,17 +167,17 @@ function createPouchMiddleware(_paths) {
     dispatch(this.actions.batchInsert(docs));
   }
 
-  return function(options) {
+  return function (options) {
     paths.forEach((path) => {
-      listen(path, options.dispatch, (err) => {
+      initializeListening(path, options.dispatch, (err) => {
         if (path.initialBatchDispatched) {
           path.initialBatchDispatched(err);
         }
       });
     });
 
-    return function(next) {
-      return function(action) {
+    return function (next) {
+      return function (action) {
         var returnValue = next(action);
         var newState = options.getState();
 
@@ -184,29 +196,29 @@ function differences(oldDocs, newDocs) {
     deleted: Object.keys(oldDocs).map(oldDocId => oldDocs[oldDocId]),
   };
 
-  var checkDoc = function(newDoc) {
+  var checkDoc = function (newDoc) {
     var id = newDoc._id;
 
     /* istanbul ignore next */
-    if (! id) {
+    if (!id) {
       warn('doc with no id');
     }
     result.deleted = result.deleted.filter(doc => doc._id !== id);
     var oldDoc = oldDocs[id];
-    if (! oldDoc) {
+    if (!oldDoc) {
       result.new.push(newDoc);
     } else if (!equal(oldDoc, newDoc)) {
       result.updated.push(newDoc);
     }
   };
 
-  if (Array.isArray(newDocs)){
+  if (Array.isArray(newDocs)) {
     newDocs.forEach(function (doc) {
       checkDoc(doc)
     });
-  } else{
+  } else {
     var keys = Object.keys(newDocs);
-    for (var key in newDocs){
+    for (var key in newDocs) {
       checkDoc(newDocs[key])
     }
   }
@@ -218,7 +230,7 @@ function differences(oldDocs, newDocs) {
 function onDbChange(path, change, dispatch) {
   var changeDoc = change.doc;
 
-  if(path.changeFilter && (! path.changeFilter(changeDoc))) {
+  if (path.changeFilter && (!path.changeFilter(changeDoc))) {
     return;
   }
 
@@ -248,7 +260,7 @@ function warn(what) {
 
 /* istanbul ignore next */
 function defaultAction(action) {
-  return function() {
+  return function () {
     throw new Error('no action provided for ' + action);
   };
 }
