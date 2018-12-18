@@ -25,7 +25,7 @@ function createPouchMiddleware(_paths) {
     propagateBatchInsert,
     handleResponse: function (err, data, cb) { cb(err); },
     queue: Queue(1),
-    delayInitialBatchInsert: false,
+    delayInitialBatchInsert: undefined,
     docs: {},
     actions: {
       remove: defaultAction('remove'),
@@ -68,7 +68,7 @@ function createPouchMiddleware(_paths) {
 
   function initializeListening(path, dispatch, initialBatchDispatched) {
     if (path.delayInitialBatchInsert) {
-      path.db.on('complete', () => {
+      path.delayInitialBatchInsert.on('complete', () => {
         listen(path, dispatch, initialBatchDispatched);
       });
     }
